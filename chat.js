@@ -30,14 +30,16 @@ window.addEventListener('DOMContentLoaded', () => {
   renderKeywords();
   startChat();
 });
-// 학번 입력 (같은 창에서는 한 번만 물어봄)
+// 학번 가져오기 (첫 화면에서 '면담 시작하기'를 누를 때 입력한 4자리 학번)
 function getStudentId() {
-  let id = '';
-  try { id = sessionStorage.getItem('studentId') || ''; } catch (e) {}
-  while (!id) {
-    const input = prompt('학번을 입력하세요 (예: 10305)');
-    if (input === null) { location.href = 'index.html'; return null; }
-    id = input.trim();
+  let id = new URLSearchParams(window.location.search).get('sid') || '';
+  if (!/^\d{4}$/.test(id)) {
+    try { id = sessionStorage.getItem('studentId') || ''; } catch (e) {}
+  }
+  if (!/^\d{4}$/.test(id)) {
+    alert('첫 화면에서 학번을 입력하고 면담을 시작해 주세요.');
+    location.href = 'index.html';
+    return null;
   }
   try { sessionStorage.setItem('studentId', id); } catch (e) {}
   return id;
@@ -263,7 +265,7 @@ function addSystemMessage(text) {
   const div         = document.createElement('div');
   div.className     = 'msg';
   div.style.cssText = 'align-self:center;max-width:92%;';
-  div.innerHTML     = `<div class="msg-bubble" style="background:rgba(80,100,200,0.06);border:1px solid rgba(80,100,200,0.15);color:rgba(30,30,80,0.45);font-size:12px;border-radius:20px;padding:6px 16px;">${text}</div>`;
+  div.innerHTML     = `<div class="msg-bubble" style="background:rgba(80,100,200,0.06);border:1px solid rgba(80,100,200,0.15);color:rgba(30,30,80,0.45);font-size:17px;border-radius:20px;padding:6px 16px;">${text}</div>`;
   document.getElementById('chatMessages').appendChild(div);
   scrollToBottom();
 }
@@ -310,8 +312,8 @@ function endSession() {
     if (foundKeywords[i]) { el.className = 'result-kw'; foundEl.appendChild(el); }
     else { el.className = 'result-kw missed'; missedEl.appendChild(el); }
   });
-  if (!foundEl.children.length)  foundEl.innerHTML  = '<span style="color:rgba(30,30,80,0.3);font-size:13px;">발견한 정보가 없습니다.</span>';
-  if (!missedEl.children.length) missedEl.innerHTML = '<span style="color:rgba(0,150,80,0.7);font-size:13px;">놓친 정보 없음! 완벽합니다 🎉</span>';
+  if (!foundEl.children.length)  foundEl.innerHTML  = '<span style="color:rgba(30,30,80,0.3);font-size:18px;">발견한 정보가 없습니다.</span>';
+  if (!missedEl.children.length) missedEl.innerHTML = '<span style="color:rgba(0,150,80,0.7);font-size:18px;">놓친 정보 없음! 완벽합니다 🎉</span>';
   document.getElementById('resultOverlay').classList.remove('hidden');
 }
 function escapeHtml(text) {
@@ -383,7 +385,7 @@ function showTranscript() {
   container.innerHTML = '';
   const convo = messages.filter(m => m.role !== 'system');
   if (!convo.length) {
-    container.innerHTML = '<p style="color:rgba(30,30,80,0.4);font-size:13px;text-align:center;">대화 내용이 없습니다.</p>';
+    container.innerHTML = '<p style="color:rgba(30,30,80,0.4);font-size:18px;text-align:center;">대화 내용이 없습니다.</p>';
   } else {
     convo.forEach(m => {
       const isUser = m.role === 'user';
