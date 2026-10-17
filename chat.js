@@ -1,408 +1,485 @@
-const PADLET_URL = 'https://padlet.com/coral015_1/drug-prevention-vaiw44tho95pydet';
-const API_URL    = 'https://script.google.com/macros/s/AKfycbyAQps2t3Xqgh6jhJc64t552SgPuPW3XtmygRd0Ghdd1mtFvtlL6NBQ2n0fOFCLvVzO/exec';
-let currentCase   = null;
-let messages      = [];
-let rapportScore  = 0;
-let currentStage  = 0;
-let foundKeywords = [];
-let isWaiting     = false;
-let studentId     = '';
-const STAGE_TIPS = [
-  { title:'🔰 1단계 · 마음 열기', text:'비난하지 말고 <strong>"그랬구나"</strong>, <strong>"많이 힘들었겠다"</strong> 같은 공감 표현을 사용해 보세요. 한두 번만 공감해도 대상자가 마음을 열기 시작해요.' },
-  { title:'💬 2단계 · 속마음 나누기', text:'<strong>"판단하려는 게 아니야"</strong>, <strong>"네 편이 되고 싶어"</strong> 같은 신뢰의 말과 함께, <strong>"언제부터 그랬어?"</strong>, <strong>"몸은 괜찮아?"</strong> 같은 구체적인 질문을 해보세요.' },
-  { title:'🙏 3단계 · 고백과 도움 요청', text:'핵심 사실을 끌어내고, 도움 기관을 자연스럽게 소개해 보세요. <strong>"같이 해결할 수 있어, 혼자가 아니야"</strong>' }
-];
-window.addEventListener('DOMContentLoaded', () => {
-  const params  = new URLSearchParams(window.location.search);
-  const caseNum = parseInt(params.get('case')) || 1;
-  currentCase   = CASES[caseNum];
-  if (!currentCase) {
-    alert('잘못된 사례 번호입니다.');
-    location.href = 'index.html';
-    return;
-  }
-  studentId = getStudentId();
-  if (!studentId) return;
-  const modal = document.getElementById('apiModal');
-  if (modal) modal.style.display = 'none';
-  applyTheme();
-  renderHeader();
-  renderKeywords();
-  startChat();
-});
-// 학번 가져오기 (첫 화면에서 '면담 시작하기'를 누를 때 입력한 4자리 학번)
-function getStudentId() {
-  let id = new URLSearchParams(window.location.search).get('sid') || '';
-  if (!/^\d{4}$/.test(id)) {
-    try { id = sessionStorage.getItem('studentId') || ''; } catch (e) {}
-  }
-  if (!/^\d{4}$/.test(id)) {
-    alert('첫 화면에서 학번을 입력하고 면담을 시작해 주세요.');
-    location.href = 'index.html';
-    return null;
-  }
-  try { sessionStorage.setItem('studentId', id); } catch (e) {}
-  return id;
-}
-function applyTheme() {
-  document.documentElement.style.setProperty('--accent-bg',     currentCase.accentBg);
-  document.documentElement.style.setProperty('--accent-border', currentCase.accentBorder);
-  document.documentElement.style.setProperty('--accent-color',  currentCase.accentColor);
-}
-function renderHeader() {
-  const topAv = document.getElementById('topAvatar');
-  const typAv = document.getElementById('typingAvatar');
-  if (currentCase.avatarImg) {
-    topAv.innerHTML = `<img src="${currentCase.avatarImg}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
-    typAv.innerHTML = `<img src="${currentCase.avatarImg}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
-  } else {
-    topAv.textContent = currentCase.avatar;
-    typAv.textContent = currentCase.avatar;
-  }
-  document.getElementById('topName').textContent      = currentCase.name;
-  document.getElementById('topSub').textContent       = currentCase.age + ' · ' + currentCase.sub;
-  const drugTag = document.getElementById('topDrugTag');
-  if (drugTag) {
-    drugTag.textContent      = '💊 ' + currentCase.drug;
-    drugTag.style.background = currentCase.accentBg;
-    drugTag.style.border     = '1px solid ' + currentCase.accentBorder;
-    drugTag.style.color      = currentCase.accentColor;
-  }
-  const kwArea = document.getElementById('topKeywords');
-  if (kwArea) {
-    kwArea.innerHTML = '';
-    kwArea.style.display  = 'flex';
-    kwArea.style.flexWrap = 'wrap';
-    kwArea.style.gap      = '4px';
-    currentCase.keywords.slice(0, 4).forEach(kw => {
-      const span       = document.createElement('span');
-      span.className   = 'keyword-tag';
-      span.textContent = '# ' + kw;
-      kwArea.appendChild(span);
-    });
-  }
-}
-function renderKeywords() {
-  const container = document.getElementById('foundKeywords');
-  container.innerHTML = '';
-  currentCase.keywords.forEach((kw, i) => {
-    const span       = document.createElement('span');
-    span.className   = 'found-kw locked';
-    span.id          = 'kw_' + i;
-    span.textContent = kw;
-    container.appendChild(span);
-  });
-  foundKeywords = new Array(currentCase.keywords.length).fill(false);
-}
-function startChat() {
-  messages = [{ role: 'system', content: currentCase.systemPrompt }];
-  addSystemMessage('📋 ' + currentCase.name + ' 면담을 시작합니다. 면담 기록지를 준비하세요.');
-  showTyping(true);
-  setTimeout(() => {
-    showTyping(false);
-    const opener = getOpeningMessage();
-    addBotMessage(opener);
-    messages.push({ role: 'assistant', content: opener });
-  }, 1500);
-}
-function getOpeningMessage() {
-  const params  = new URLSearchParams(window.location.search);
-  const caseNum = parseInt(params.get('case')) || 1;
-  const openers = {
-    1: '...네.',
-    2: '...안녕하세요.',
-    3: '...어, 왔어요.'
-  };
-  return openers[caseNum] || '...안녕하세요.';
-}
-async function sendMessage() {
-  if (isWaiting) return;
-  const input = document.getElementById('userInput');
-  const text  = input.value.trim();
-  if (!text) return;
-  input.value        = '';
-  input.style.height = 'auto';
-  addUserMessage(text);
-  messages.push({ role: 'user', content: text });
-  analyzeUserMessage(text);
-  isWaiting = true;
-  document.getElementById('sendBtn').disabled = true;
-  showTyping(true);
-  scrollToBottom();
-  try {
-    const reply = await callServer();
-    showTyping(false);
-    addBotMessage(reply);
-    messages.push({ role: 'assistant', content: reply });
-    analyzeAIReply(reply);
-  } catch (err) {
-    showTyping(false);
-    addSystemMessage('⚠ 오류: ' + err.message);
-  }
-  isWaiting = false;
-  document.getElementById('sendBtn').disabled = false;
-  input.focus();
-  scrollToBottom();
-}
-async function callServer() {
-  // Apps Script로 요청 (text/plain으로 보내야 브라우저 보안(CORS) 문제가 생기지 않음)
-  const res = await fetch(API_URL, {
-    method  : 'POST',
-    headers : { 'Content-Type': 'text/plain;charset=utf-8' },
-    body    : JSON.stringify({
-      messages : messages,
-      student  : studentId,
-      caseNum  : parseInt(new URLSearchParams(window.location.search).get('case')) || 1
-    })
-  });
-  const data = await res.json();
-  if (data.error) {
-    throw new Error(data.error.message || 'API 호출 실패');
-  }
-  return data.reply;
-}
-function analyzeUserMessage(text) {
-  const empathy  = ['힘들었겠다','그랬구나','많이 힘들었','이해해','괜찮아','걱정돼','판단 안 해','네 편','혼자 아니','같이','어떤 느낌','어떻게 됐어','많이 무섭','용기','말해줘서 고마','힘내','응원','도와주고 싶'];
-  const negative = ['왜 그랬어','멍청','잘못','신고','경찰','처벌','범죄자','문제야','나쁜'];
-  let delta = 0;
-  empathy.forEach(w  => { if (text.includes(w)) delta += 12; });
-  negative.forEach(w => { if (text.includes(w)) delta -= 10; });
-  if (delta > 0) updateRapport(delta);
-}
-function analyzeAIReply(text) {
-  const params  = new URLSearchParams(window.location.search);
-  const caseNum = parseInt(params.get('case')) || 1;
-  const triggerMap = {
-    1: {
-      0: ['식욕억제제','나비약','다이어트약','처방'],
-      1: ['프로아나','커뮤니티','인스타','살 빼','처음'],
-      2: ['심장','두근','손 떨','숨이','어지'],
-      3: ['잠','못 자','불면','피곤','금단'],
-      4: ['명의','엄마 이름','처방전','병원 여러'],
-      5: ['병원 쇼핑','여러 병원','돌아다','다른 병원'],
-      6: ['부모','엄마','아빠','가족','집'],
-      7: ['도와','그만','병원','상담','벗어','살고 싶']
-    },
-    2: {
-      0: ['ADHD','치료제','스마트 알약','약'],
-      1: ['SNS','광고','텔레그램','성적','처음'],
-      2: ['이가','치아','잇몸','입이 말라','아파'],
-      3: ['잠','못 자','수면','피곤','환각'],
-      4: ['던지기','알바','심부름','운반','배달'],
-      5: ['사기','중고','돈','빚'],
-      6: ['부모','엄마','아빠','가족','집'],
-      7: ['도와','그만','병원','상담','벗어','살고 싶']
-    },
-    3: {
-      0: ['펜타닐','패치','약'],
-      1: ['틱톡','SNS','영상','친구','처음','좀비'],
-      2: ['멍','어지','모르겠','기억','말이'],
-      3: ['뼈','통증','오한','설사','금단'],
-      4: ['훔쳤','가져갔','보건실','절도'],
-      5: ['따돌림','친구 없','혼자','무시','괴롭'],
-      6: ['부모','엄마','아빠','가족','집'],
-      7: ['도와','그만','병원','상담','벗어','살고 싶']
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>마약 예방 교육 - 면담 채팅</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+      font-size:21px;
+      font-family:'Noto Sans KR',sans-serif;
+      background:#f0f4ff;
+      color:#1a1a2e;
+      height:100vh;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
     }
-  };
-  const triggers = triggerMap[caseNum] || triggerMap[1];
-  Object.keys(triggers).forEach(idx => {
-    const i = parseInt(idx);
-    if (!foundKeywords[i]) {
-      const hit = triggers[idx].some(w => text.includes(w));
-      if (hit) unlockKeyword(i);
+    /* 상단 바 */
+    .top-bar{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:12px 20px;
+      background:rgba(255,255,255,0.85);
+      border-bottom:1px solid rgba(30,30,80,0.1);
+      flex-shrink:0;gap:12px;
     }
-  });
-}
-function unlockKeyword(idx) {
-  if (foundKeywords[idx]) return;
-  foundKeywords[idx] = true;
-  const el = document.getElementById('kw_' + idx);
-  if (el) {
-    el.classList.remove('locked');
-    el.classList.add('unlocked');
-    el.style.animation = 'none';
-    requestAnimationFrame(() => { el.style.animation = 'msgIn 0.4s ease'; });
-  }
-  updateRapport(8);
-}
-function updateRapport(delta) {
-  rapportScore = Math.min(100, Math.max(0, rapportScore + delta));
-  document.getElementById('rapportFill').style.width = rapportScore + '%';
-  document.getElementById('rapportPct').textContent  = rapportScore + '%';
-  const newStage = rapportScore < 35 ? 0 : rapportScore < 70 ? 1 : 2;
-  if (newStage !== currentStage) { currentStage = newStage; updateStage(newStage); }
-}
-function updateStage(stage) {
-  for (let i = 0; i < 3; i++) {
-    const el = document.getElementById('stage' + i);
-    if (!el) continue;
-    el.classList.remove('active', 'done');
-    if (i < stage)   el.classList.add('done');
-    if (i === stage) el.classList.add('active');
-  }
-  document.getElementById('tipTitle').textContent = STAGE_TIPS[stage].title;
-  document.getElementById('tipText').innerHTML    = STAGE_TIPS[stage].text;
-}
-function addBotMessage(text) {
-  const isSymptom = /잠깐|잠시|어지|아파|말라|두근|화장실|가렵|욱신|못 잤|멍|손이 떨|머리|뼈가|오한/.test(text);
-  const div       = document.createElement('div');
-  div.className   = 'msg ' + (isSymptom ? 'symptom' : 'bot');
-  const avHtml = currentCase.avatarImg
-    ? `<div class="msg-avatar" style="overflow:hidden;padding:0;"><img src="${currentCase.avatarImg}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`
-    : `<div class="msg-avatar">${currentCase.avatar}</div>`;
-  div.innerHTML   = avHtml + `<div class="msg-bubble">${escapeHtml(text)}</div>`;
-  document.getElementById('chatMessages').appendChild(div);
-  scrollToBottom();
-}
-function addUserMessage(text) {
-  const div     = document.createElement('div');
-  div.className = 'msg user';
-  div.innerHTML = `<div class="msg-avatar">🧑‍💼</div><div class="msg-bubble">${escapeHtml(text)}</div>`;
-  document.getElementById('chatMessages').appendChild(div);
-  scrollToBottom();
-}
-function addSystemMessage(text) {
-  const div         = document.createElement('div');
-  div.className     = 'msg';
-  div.style.cssText = 'align-self:center;max-width:92%;';
-  div.innerHTML     = `<div class="msg-bubble" style="background:rgba(80,100,200,0.06);border:1px solid rgba(80,100,200,0.15);color:rgba(30,30,80,0.45);font-size:17px;border-radius:20px;padding:6px 16px;">${text}</div>`;
-  document.getElementById('chatMessages').appendChild(div);
-  scrollToBottom();
-}
-function showTyping(show) {
-  const el = document.getElementById('typingIndicator');
-  if (!el) return;
-  el.classList.toggle('hidden', !show);
-  if (show) scrollToBottom();
-}
-function scrollToBottom() {
-  const el = document.getElementById('chatMessages');
-  if (el) setTimeout(() => { el.scrollTop = el.scrollHeight; }, 50);
-}
-function autoResize(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
-}
-function handleKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-}
-function endSession() {
-  if (!confirm('면담을 종료하고 결과를 확인하시겠습니까?')) return;
-  const total = currentCase.keywords.length;
-  const found = foundKeywords.filter(Boolean).length;
-  const score = Math.round((found / total) * 100);
-  document.getElementById('resultSub').textContent = `${currentCase.name} (${currentCase.age}) 와의 상담 결과입니다.`;
-  document.getElementById('resultScoreNum').textContent = score + '점';
-  const msgs = [
-    '대상자의 마음을 여는 데 실패했습니다. 공감과 경청이 중요해요.',
-    '아쉬운 부분이 있네요. 다음엔 더 깊은 대화를 나눠보세요.',
-    '좋은 상담이었습니다. 대부분의 정보를 얻으셨네요.',
-    '훌륭한 상담가시네요! 거의 모든 정보를 파악했습니다.',
-    '완벽합니다! 모든 정보를 파악했어요. 🎉'
-  ];
-  const msgIdx = score < 20 ? 0 : score < 40 ? 1 : score < 70 ? 2 : score < 100 ? 3 : 4;
-  document.getElementById('resultScoreLabel').textContent = msgs[msgIdx];
-  const foundEl  = document.getElementById('resultFoundList');
-  const missedEl = document.getElementById('resultMissedList');
-  foundEl.innerHTML  = '';
-  missedEl.innerHTML = '';
-  currentCase.keywords.forEach((kw, i) => {
-    const el = document.createElement('span');
-    el.textContent = kw;
-    if (foundKeywords[i]) { el.className = 'result-kw'; foundEl.appendChild(el); }
-    else { el.className = 'result-kw missed'; missedEl.appendChild(el); }
-  });
-  if (!foundEl.children.length)  foundEl.innerHTML  = '<span style="color:rgba(30,30,80,0.3);font-size:18px;">발견한 정보가 없습니다.</span>';
-  if (!missedEl.children.length) missedEl.innerHTML = '<span style="color:rgba(0,150,80,0.7);font-size:18px;">놓친 정보 없음! 완벽합니다 🎉</span>';
-  document.getElementById('resultOverlay').classList.remove('hidden');
-}
-function escapeHtml(text) {
-  const d = document.createElement('div');
-  d.textContent = text;
-  return d.innerHTML;
-}
-async function saveResultImage() {
-  const btn = document.getElementById('saveImgBtn');
-  const target = document.querySelector('.result-box');
-  if (!target || typeof html2canvas === 'undefined') {
-    alert('이미지 저장 기능을 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.');
-    return;
-  }
-  const originalLabel = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '⏳ 저장 중...';
-  // 캡처 시에는 저장/공유 버튼이 이미지에 함께 찍히지 않도록 잠깐 숨김
-  const actionRow      = document.querySelector('.result-action-row');
-  const backBtn        = document.querySelector('.result-back-btn');
-  const transcriptBtn  = document.querySelector('.transcript-btn');
-  if (actionRow)     actionRow.style.visibility     = 'hidden';
-  if (backBtn)       backBtn.style.visibility       = 'hidden';
-  if (transcriptBtn) transcriptBtn.style.visibility = 'hidden';
-  // 스크롤된 내부 영역까지 전체가 캡처되도록, 캡처 동안만 스크롤을 풀고 전체 높이를 펼침
-  const originalMaxHeight = target.style.maxHeight;
-  const originalOverflowY = target.style.overflowY;
-  const originalScrollTop = target.scrollTop;
-  target.style.maxHeight = 'none';
-  target.style.overflowY = 'visible';
-  target.scrollTop = 0;
-  try {
-    const canvas = await html2canvas(target, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      useCORS: true,
-      windowHeight: target.scrollHeight,
-      height: target.scrollHeight
-    });
-    const dataUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    const params  = new URLSearchParams(window.location.search);
-    const caseNum = parseInt(params.get('case')) || 1;
-    // 한글 파일명은 일부 브라우저/환경에서 다운로드 시 깨지는 경우가 있어 영문+숫자로 저장
-    link.download = `interview-result-case${caseNum}.png`;
-    link.href = dataUrl;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  } catch (err) {
-    console.error('이미지 저장 실패:', err);
-    alert('이미지 저장에 실패했습니다: ' + err.message);
-  } finally {
-    target.style.maxHeight = originalMaxHeight;
-    target.style.overflowY = originalOverflowY;
-    target.scrollTop = originalScrollTop;
-    if (actionRow)     actionRow.style.visibility     = 'visible';
-    if (backBtn)       backBtn.style.visibility       = 'visible';
-    if (transcriptBtn) transcriptBtn.style.visibility = 'visible';
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-  }
-}
-function openPadlet() {
-  window.open(PADLET_URL, '_blank', 'noopener');
-}
-function showTranscript() {
-  const container = document.getElementById('transcriptMessages');
-  container.innerHTML = '';
-  const convo = messages.filter(m => m.role !== 'system');
-  if (!convo.length) {
-    container.innerHTML = '<p style="color:rgba(30,30,80,0.4);font-size:18px;text-align:center;">대화 내용이 없습니다.</p>';
-  } else {
-    convo.forEach(m => {
-      const isUser = m.role === 'user';
-      const div = document.createElement('div');
-      div.className = 'transcript-msg ' + (isUser ? 'user' : 'bot');
-      div.innerHTML = `<div class="transcript-bubble">${escapeHtml(m.content)}</div>`;
-      container.appendChild(div);
-    });
-  }
-  const sub = document.getElementById('transcriptSub');
-  if (sub) {
-    sub.textContent = currentCase
-      ? `${currentCase.name} (${currentCase.age})와의 대화 · 총 ${convo.length}개 메시지`
-      : '';
-  }
-  document.getElementById('transcriptOverlay').classList.remove('hidden');
-}
-function closeTranscript() {
-  document.getElementById('transcriptOverlay').classList.add('hidden');
-}
+    .top-left{display:flex;align-items:center;gap:12px;}
+    .back-btn{white-space:nowrap;
+      background:rgba(80,100,200,0.07);
+      border:1px solid rgba(80,100,200,0.18);
+      color:rgba(30,30,80,0.65);
+      padding:7px 14px;border-radius:8px;
+      font-size:20px;font-family:'Noto Sans KR',sans-serif;
+      cursor:pointer;transition:all 0.2s;
+    }
+    .back-btn:hover{background:rgba(80,100,200,0.14);color:#1a1a2e;}
+    .case-avatar{
+      width:42px;height:42px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:25px;flex-shrink:0;
+      border:2px solid rgba(80,100,200,0.2);
+      background:rgba(80,100,200,0.07);
+    }
+    .case-name-area{display:flex;flex-direction:column;gap:2px;}
+    .case-name-area h2{font-size:22px;font-weight:700;color:#1a1a2e;}
+    .case-name-area span{font-size:19px;color:rgba(30,30,80,0.45);}
+    .top-tag-area{
+      display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:4px;
+    }
+    .drug-tag{
+      font-size:18px;padding:2px 10px;border-radius:20px;
+      font-weight:700;white-space:nowrap;
+    }
+    .keyword-tag{
+      font-size:17px;padding:2px 8px;border-radius:20px;
+      background:rgba(30,30,80,0.06);
+      border:1px solid rgba(30,30,80,0.12);
+      color:rgba(30,30,80,0.4);
+      white-space:nowrap;
+    }
+    /* 라포 게이지 */
+    .rapport-area{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+    .rapport-label{font-size:19px;color:rgba(30,30,80,0.45);white-space:nowrap;}
+    .rapport-bar{
+      width:130px;height:6px;
+      background:rgba(30,30,80,0.1);
+      border-radius:10px;overflow:hidden;
+    }
+    .rapport-fill{
+      height:100%;border-radius:10px;
+      background:linear-gradient(90deg,#ff6666,#ffaa00,#44cc88);
+      transition:width 1s ease;width:0%;
+    }
+    .rapport-pct{font-size:19px;font-weight:700;color:#1a1a2e;min-width:34px;}
+    /* 메인 레이아웃 */
+    .main-layout{display:flex;flex:1;overflow:hidden;}
+    .chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+    /* 채팅 메시지 */
+    .chat-messages{
+      flex:1;overflow-y:auto;
+      padding:20px 20px 8px;
+      display:flex;flex-direction:column;
+      gap:14px;scroll-behavior:smooth;
+    }
+    .chat-messages::-webkit-scrollbar{width:4px;}
+    .chat-messages::-webkit-scrollbar-thumb{background:rgba(30,30,80,0.12);border-radius:4px;}
+    .msg{display:flex;gap:10px;max-width:78%;animation:msgIn 0.3s ease;}
+    @keyframes msgIn{
+      from{opacity:0;transform:translateY(8px);}
+      to{opacity:1;transform:translateY(0);}
+    }
+    .msg.user{align-self:flex-end;flex-direction:row-reverse;}
+    .msg.bot{align-self:flex-start;}
+    .msg.symptom{align-self:flex-start;max-width:72%;}
+    .msg-avatar{
+      width:34px;height:34px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:21px;flex-shrink:0;
+      border:1.5px solid rgba(30,30,80,0.12);
+      background:rgba(80,100,200,0.07);
+    }
+    .msg-bubble{padding:11px 15px;border-radius:16px;font-size:21px;line-height:1.75;}
+    .msg.bot .msg-bubble{
+      background:rgba(255,255,255,0.9);
+      border:1px solid rgba(30,30,80,0.1);
+      border-bottom-left-radius:4px;
+      color:#1a1a2e;
+      box-shadow:0 2px 8px rgba(30,30,80,0.06);
+    }
+    .msg.user .msg-bubble{
+      background:var(--accent-bg,rgba(80,120,255,0.15));
+      border:1px solid var(--accent-border,rgba(80,120,255,0.35));
+      border-bottom-right-radius:4px;
+      color:#1a1a2e;
+    }
+    .msg.symptom .msg-bubble{
+      background:rgba(255,160,0,0.07);
+      border:1px solid rgba(255,160,0,0.22);
+      border-bottom-left-radius:4px;
+      color:rgba(150,90,0,0.9);
+      font-style:italic;font-size:20px;
+    }
+    /* 타이핑 인디케이터 */
+    .typing-indicator{
+      display:flex;align-items:center;gap:10px;
+      align-self:flex-start;padding:0 4px;
+    }
+    .typing-indicator.hidden{display:none;}
+    .typing-dots{
+      display:flex;gap:5px;
+      background:rgba(255,255,255,0.9);
+      border:1px solid rgba(30,30,80,0.1);
+      padding:12px 16px;border-radius:16px;
+      border-bottom-left-radius:4px;
+      box-shadow:0 2px 8px rgba(30,30,80,0.06);
+    }
+    .typing-dots span{
+      width:7px;height:7px;
+      background:rgba(30,30,80,0.3);
+      border-radius:50%;animation:dot 1.2s infinite;
+    }
+    .typing-dots span:nth-child(2){animation-delay:0.2s;}
+    .typing-dots span:nth-child(3){animation-delay:0.4s;}
+    @keyframes dot{
+      0%,80%,100%{transform:scale(0.7);opacity:0.4;}
+      40%{transform:scale(1);opacity:1;}
+    }
+    /* 입력창 */
+    .input-area{
+      padding:14px 20px;
+      background:rgba(255,255,255,0.8);
+      border-top:1px solid rgba(30,30,80,0.08);
+      display:flex;gap:10px;align-items:flex-end;flex-shrink:0;
+    }
+    .input-wrap{
+      flex:1;background:rgba(255,255,255,0.95);
+      border:1px solid rgba(30,30,80,0.14);
+      border-radius:14px;padding:11px 16px;
+      transition:border-color 0.2s;
+      box-shadow:0 2px 8px rgba(30,30,80,0.05);
+    }
+    .input-wrap:focus-within{border-color:var(--accent-border,rgba(80,120,255,0.5));}
+    #userInput{
+      width:100%;background:transparent;
+      border:none;outline:none;color:#1a1a2e;
+      font-size:21px;font-family:'Noto Sans KR',sans-serif;
+      resize:none;max-height:100px;line-height:1.6;
+    }
+    #userInput::placeholder{color:rgba(30,30,80,0.3);}
+    .send-btn{
+      width:46px;height:46px;border-radius:12px;border:none;
+      background:var(--accent-bg,rgba(80,120,255,0.25));
+      color:var(--accent-color,#3355dd);
+      font-size:23px;cursor:pointer;
+      transition:all 0.2s;
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;
+      border:1px solid var(--accent-border,rgba(80,120,255,0.4));
+    }
+    .send-btn:hover{filter:brightness(0.9);transform:scale(1.05);}
+    .send-btn:disabled{opacity:0.35;cursor:not-allowed;transform:none;}
+    /* 사이드 패널 */
+    .side-panel{
+      width:clamp(340px, 30vw, 580px);border-left:1px solid rgba(30,30,80,0.09);
+      background:rgba(255,255,255,0.6);
+      display:flex;flex-direction:column;
+      overflow-y:auto;flex-shrink:0;
+    }
+    .side-panel::-webkit-scrollbar{width:3px;}
+    .side-panel::-webkit-scrollbar-thumb{background:rgba(30,30,80,0.1);border-radius:4px;}
+    .panel-section{padding:16px 14px;border-bottom:1px solid rgba(30,30,80,0.07);}
+    .panel-section h4{
+      font-size:18px;font-weight:700;letter-spacing:2px;
+      color:rgba(30,30,80,0.35);margin-bottom:12px;text-transform:uppercase;
+    }
+    /* 단계 리스트 */
+    .stage-list{display:flex;flex-direction:column;gap:7px;}
+    .stage-item{
+      display:flex;align-items:center;gap:10px;
+      padding:8px 10px;border-radius:8px;font-size:19px;
+      color:rgba(30,30,80,0.35);
+      background:rgba(30,30,80,0.02);
+      border:1px solid transparent;transition:all 0.4s;
+    }
+    .stage-item.active{
+      color:#1a1a2e;
+      background:rgba(80,120,255,0.07);
+      border-color:rgba(80,120,255,0.2);
+    }
+    .stage-item.done{
+      color:rgba(0,140,80,0.85);
+      background:rgba(0,180,100,0.06);
+      border-color:rgba(0,180,100,0.18);
+    }
+    .stage-dot{width:8px;height:8px;border-radius:50%;background:rgba(30,30,80,0.15);flex-shrink:0;}
+    .stage-item.active .stage-dot{
+      background:var(--accent-color,#3355dd);
+      box-shadow:0 0 6px var(--accent-color,#3355dd);
+      animation:pulse 1.5s infinite;
+    }
+    .stage-item.done .stage-dot{background:rgba(0,180,100,0.8);}
+    @keyframes pulse{
+      0%,100%{transform:scale(1);opacity:1;}
+      50%{transform:scale(1.4);opacity:0.7;}
+    }
+    /* 팁 박스 */
+    .tip-box{
+      background:rgba(255,200,50,0.08);
+      border:1px solid rgba(200,150,0,0.2);
+      border-radius:10px;padding:12px;
+      font-size:19px;color:rgba(120,80,0,0.9);line-height:1.7;
+    }
+    .tip-title{font-weight:700;margin-bottom:6px;}
+    /* 발견 키워드 */
+    .found-keywords{display:flex;flex-wrap:wrap;gap:6px;}
+    .found-kw{font-size:15px;padding:2px 8px;border-radius:8px;transition:all 0.4s;}
+    .found-kw.locked{
+      background:rgba(30,30,80,0.04);
+      border:1px solid rgba(30,30,80,0.09);
+      color:rgba(30,30,80,0.25);
+    }
+    .found-kw.unlocked{
+      background:rgba(0,180,100,0.08);
+      border:1px solid rgba(0,180,100,0.22);
+      color:rgba(0,140,80,0.9);
+    }
+    /* 종료 버튼 */
+    .end-btn{
+      position:sticky;bottom:0;margin-top:auto;
+      padding:14px;border-radius:0;
+      border:none;border-top:1px solid rgba(200,60,60,0.25);
+      background:#fff3f3;
+      color:rgba(180,40,40,0.8);
+      font-size:20px;font-weight:700;
+      font-family:'Noto Sans KR',sans-serif;
+      cursor:pointer;transition:all 0.2s;
+      width:100%;flex-shrink:0;z-index:2;
+    }
+    .end-btn:hover{background:#ffe3e3;color:#cc2222;}
+    /* 결과 오버레이 */
+    .result-overlay{
+      position:fixed;inset:0;
+      background:rgba(200,210,255,0.6);
+      display:flex;align-items:center;justify-content:center;
+      z-index:999;backdrop-filter:blur(8px);
+    }
+    .result-overlay.hidden{display:none;}
+    .result-box{
+      background:#fff;
+      border:1px solid rgba(30,30,80,0.12);
+      border-radius:24px;padding:36px;
+      width:90%;max-width:540px;
+      max-height:85vh;overflow-y:auto;
+      box-shadow:0 20px 60px rgba(30,30,80,0.15);
+    }
+    .result-box h2{font-size:29px;font-weight:900;color:#1a1a2e;margin-bottom:6px;}
+    .result-sub{font-size:20px;color:rgba(30,30,80,0.45);margin-bottom:24px;}
+    .result-score-wrap{text-align:center;margin:20px 0;}
+    .result-score-num{
+      font-size:71px;font-weight:900;
+      background:linear-gradient(135deg,#2233aa,#5566ff,#8844cc);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;
+    }
+    .result-score-label{font-size:21px;color:rgba(30,30,80,0.45);margin-top:6px;}
+    .result-section{margin-bottom:20px;}
+    .result-section h4{
+      font-size:18px;font-weight:700;letter-spacing:2px;
+      color:rgba(30,30,80,0.35);text-transform:uppercase;margin-bottom:10px;
+    }
+    .result-kw-list{display:flex;flex-wrap:wrap;gap:7px;}
+    .result-kw{
+      font-size:19px;padding:4px 12px;border-radius:8px;
+      background:rgba(0,180,100,0.08);
+      border:1px solid rgba(0,180,100,0.22);
+      color:rgba(0,140,80,0.9);
+    }
+    .result-kw.missed{
+      background:rgba(255,80,80,0.07);
+      border-color:rgba(255,80,80,0.2);
+      color:rgba(200,40,40,0.8);
+    }
+    .help-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+    .help-card{
+      background:rgba(80,100,200,0.05);
+      border:1px solid rgba(80,100,200,0.12);
+      border-radius:10px;padding:10px 14px;
+      font-size:19px;color:rgba(30,30,80,0.5);
+    }
+    .help-card strong{display:block;font-size:22px;color:#1a1a2e;margin-top:3px;}
+    .result-back-btn{
+      width:100%;padding:13px;border-radius:12px;border:none;
+      background:linear-gradient(135deg,#4466ff,#7744ff);
+      color:#fff;font-size:22px;font-weight:700;
+      font-family:'Noto Sans KR',sans-serif;
+      cursor:pointer;transition:all 0.2s;margin-top:8px;
+    }
+    .result-back-btn:hover{filter:brightness(1.1);}
+    .result-action-row{display:flex;gap:8px;margin-top:10px;}
+    .result-action-btn{
+      flex:1;padding:12px;border-radius:12px;
+      font-size:21px;font-weight:700;
+      font-family:'Noto Sans KR',sans-serif;
+      cursor:pointer;transition:all 0.2s;
+      display:flex;align-items:center;justify-content:center;gap:6px;
+    }
+    .save-img-btn{
+      border:1px solid rgba(80,120,255,0.35);
+      background:rgba(80,120,255,0.08);
+      color:#3355dd;
+    }
+    .save-img-btn:hover{background:rgba(80,120,255,0.15);}
+    .save-img-btn:disabled{opacity:0.5;cursor:not-allowed;}
+    .padlet-btn{
+      border:1px solid rgba(0,180,100,0.35);
+      background:rgba(0,180,100,0.08);
+      color:#00994d;
+    }
+    .padlet-btn:hover{background:rgba(0,180,100,0.15);}
+    .transcript-btn{
+      width:100%;margin-top:8px;
+      border:1px solid rgba(120,80,220,0.35);
+      background:rgba(120,80,220,0.08);
+      color:#6633bb;
+    }
+    .transcript-btn:hover{background:rgba(120,80,220,0.15);}
+    .transcript-messages{
+      display:flex;flex-direction:column;gap:12px;
+      margin-bottom:20px;max-height:55vh;overflow-y:auto;padding-right:4px;
+    }
+    .transcript-msg{display:flex;max-width:85%;}
+    .transcript-msg.user{align-self:flex-end;justify-content:flex-end;}
+    .transcript-msg.bot{align-self:flex-start;}
+    .transcript-bubble{
+      padding:10px 14px;border-radius:14px;font-size:19px;line-height:1.65;color:#1a1a2e;
+    }
+    .transcript-msg.user .transcript-bubble{
+      background:rgba(80,120,255,0.12);border:1px solid rgba(80,120,255,0.3);
+      border-bottom-right-radius:4px;
+    }
+    .transcript-msg.bot .transcript-bubble{
+      background:rgba(30,30,80,0.05);border:1px solid rgba(30,30,80,0.1);
+      border-bottom-left-radius:4px;
+    }
+    @media(max-width:768px){.side-panel{display:none;}}
+    @media(max-width:480px){
+      .rapport-area{display:none;}
+      .top-tag-area{display:none;}
+    }
+  </style>
+</head>
+<body>
+<!-- 결과 오버레이 -->
+<div class="result-overlay hidden" id="resultOverlay">
+  <div class="result-box">
+    <h2>📋 면담 종료 리포트</h2>
+    <p class="result-sub" id="resultSub"></p>
+    <div class="result-score-wrap">
+      <div class="result-score-num" id="resultScoreNum">0점</div>
+      <div class="result-score-label" id="resultScoreLabel"></div>
+    </div>
+    <div class="result-section">
+      <h4>✅ 발견한 정보</h4>
+      <div class="result-kw-list" id="resultFoundList"></div>
+    </div>
+    <div class="result-section">
+      <h4>❌ 놓친 정보</h4>
+      <div class="result-kw-list" id="resultMissedList"></div>
+    </div>
+    <div class="result-section">
+      <h4>📞 실제 도움 기관</h4>
+      <div class="help-grid">
+        <div class="help-card">마약류 중독 상담<strong>1899-0357</strong></div>
+        <div class="help-card">청소년 상담전화<strong>1388</strong></div>
+        <div class="help-card">정신건강 위기상담<strong>1577-0199</strong></div>
+        <div class="help-card">학교폭력 신고<strong>117</strong></div>
+      </div>
+    </div>
+    <button class="result-action-btn transcript-btn" onclick="showTranscript()">🗨️ 대화 다시보기</button>
+    <div class="result-action-row">
+      <button class="result-action-btn save-img-btn" id="saveImgBtn" onclick="saveResultImage()">📷 이미지로 저장</button>
+      <button class="result-action-btn padlet-btn" onclick="openPadlet()">📌 패들릿에 공유하기</button>
+    </div>
+    <button class="result-back-btn" onclick="location.href='index.html'">
+      ← 목록으로 돌아가기
+    </button>
+  </div>
+</div>
+<!-- 대화 다시보기 오버레이 -->
+<div class="result-overlay hidden" id="transcriptOverlay" style="z-index:1000;">
+  <div class="result-box" style="max-width:640px;">
+    <h2>🗨️ 대화 다시보기</h2>
+    <p class="result-sub" id="transcriptSub"></p>
+    <div class="transcript-messages" id="transcriptMessages"></div>
+    <button class="result-back-btn" onclick="closeTranscript()">← 결과로 돌아가기</button>
+  </div>
+</div>
+<!-- 상단 바 -->
+<div class="top-bar">
+  <div class="top-left">
+    <button class="back-btn" onclick="location.href='index.html'">← 목록</button>
+    <div class="case-avatar" id="topAvatar">👦</div>
+    <div class="case-name-area">
+      <h2 id="topName">로딩 중...</h2>
+      <span id="topSub"></span>
+      <div class="top-tag-area" id="topTagArea">
+        <span class="drug-tag" id="topDrugTag"></span>
+        <div id="topKeywords"></div>
+      </div>
+    </div>
+  </div>
+  <div class="rapport-area">
+    <span class="rapport-label">라포 형성도</span>
+    <div class="rapport-bar">
+      <div class="rapport-fill" id="rapportFill"></div>
+    </div>
+    <span class="rapport-pct" id="rapportPct">0%</span>
+  </div>
+</div>
+<!-- 메인 레이아웃 -->
+<div class="main-layout">
+  <div class="chat-area">
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="typing-indicator hidden" id="typingIndicator">
+      <div class="msg-avatar" id="typingAvatar">👦</div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    </div>
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea id="userInput" rows="1"
+          placeholder="면담자로서 메시지를 입력하세요..."
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"></textarea>
+      </div>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+  <!-- 사이드 패널 -->
+  <div class="side-panel">
+    <div class="panel-section">
+      <h4>📊 면담 진행 단계</h4>
+      <div class="stage-list">
+        <div class="stage-item active" id="stage0"><div class="stage-dot"></div><span>1단계 · 마음 열기</span></div>
+        <div class="stage-item" id="stage1"><div class="stage-dot"></div><span>2단계 · 속마음 나누기</span></div>
+        <div class="stage-item" id="stage2"><div class="stage-dot"></div><span>3단계 · 고백과 도움 요청</span></div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <h4>💡 면담 팁</h4>
+      <div class="tip-box">
+        <div class="tip-title" id="tipTitle">🔰 시작 단계</div>
+        <div id="tipText">비난하지 말고 <strong>"그랬구나"</strong>, <strong>"많이 힘들었겠다"</strong> 같은 공감 표현을 사용해보세요.</div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <h4>🔍 발견한 정보</h4>
+      <div class="found-keywords" id="foundKeywords"></div>
+    </div>
+    <button class="end-btn" onclick="endSession()">⏹ 면담 종료</button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="cases.js"></script>
+<script src="chat.js"></script>
+</body>
+</html>
