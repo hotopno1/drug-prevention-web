@@ -181,7 +181,7 @@
     .send-btn:disabled{opacity:0.35;cursor:not-allowed;transform:none;}
     /* 사이드 패널 */
     .side-panel{
-      width:260px;border-left:1px solid rgba(30,30,80,0.09);
+      width:clamp(340px, 30vw, 580px);border-left:1px solid rgba(30,30,80,0.09);
       background:rgba(255,255,255,0.6);
       display:flex;flex-direction:column;
       overflow-y:auto;flex-shrink:0;
@@ -233,7 +233,7 @@
     .tip-title{font-weight:700;margin-bottom:6px;}
     /* 발견 키워드 */
     .found-keywords{display:flex;flex-wrap:wrap;gap:6px;}
-    .found-kw{font-size:18px;padding:3px 10px;border-radius:8px;transition:all 0.4s;}
+    .found-kw{font-size:15px;padding:2px 8px;border-radius:8px;transition:all 0.4s;}
     .found-kw.locked{
       background:rgba(30,30,80,0.04);
       border:1px solid rgba(30,30,80,0.09);
@@ -246,16 +246,17 @@
     }
     /* 종료 버튼 */
     .end-btn{
-      margin:14px;padding:11px;border-radius:10px;
-      border:1px solid rgba(200,60,60,0.25);
-      background:rgba(255,80,80,0.06);
+      position:sticky;bottom:0;margin-top:auto;
+      padding:14px;border-radius:0;
+      border:none;border-top:1px solid rgba(200,60,60,0.25);
+      background:#fff3f3;
       color:rgba(180,40,40,0.8);
       font-size:20px;font-weight:700;
       font-family:'Noto Sans KR',sans-serif;
       cursor:pointer;transition:all 0.2s;
-      width:calc(100% - 28px);
+      width:100%;flex-shrink:0;z-index:2;
     }
-    .end-btn:hover{background:rgba(255,80,80,0.12);color:#cc2222;}
+    .end-btn:hover{background:#ffe3e3;color:#cc2222;}
     /* 결과 오버레이 */
     .result-overlay{
       position:fixed;inset:0;
