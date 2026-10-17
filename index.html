@@ -71,7 +71,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      max-width: 700px;
+      max-width: 1000px;
       margin: 0 auto 48px;
       font-size: 18px;
       color: rgba(120,80,0,0.9);
@@ -101,6 +101,8 @@
       position: relative;
       overflow: hidden;
       box-shadow: 0 4px 20px rgba(80,100,200,0.08);
+      display: flex;
+      flex-direction: column;
     }
     .case-card::before {
       content: '';
@@ -164,6 +166,7 @@
     .avatar-info .age-gender { font-size: 18px; color: rgba(30,30,80,0.5); }
     .divider { height: 1px; background: rgba(30,30,80,0.08); margin-bottom: 18px; }
     .drug-tag {
+      align-self: flex-start;
       display: inline-flex; align-items: center; gap: 6px;
       background: var(--tag-bg);
       border: 1px solid var(--card-accent);
@@ -181,6 +184,7 @@
       padding: 3px 10px; border-radius: 8px;
     }
     .start-btn {
+      margin-top: auto;
       width: 100%; padding: 13px; border-radius: 12px;
       border: 1px solid var(--card-accent);
       background: var(--tag-bg);
