@@ -6,6 +6,7 @@ let rapportScore  = 0;
 let currentStage  = 0;
 let foundKeywords = [];
 let isWaiting     = false;
+let studentId     = '';
 const STAGE_TIPS = [
   { title:'🔰 1단계 · 마음 열기', text:'비난하지 말고 <strong>"그랬구나"</strong>, <strong>"많이 힘들었겠다"</strong> 같은 공감 표현을 사용해 보세요. 한두 번만 공감해도 대상자가 마음을 열기 시작해요.' },
   { title:'💬 2단계 · 속마음 나누기', text:'<strong>"판단하려는 게 아니야"</strong>, <strong>"네 편이 되고 싶어"</strong> 같은 신뢰의 말과 함께, <strong>"언제부터 그랬어?"</strong>, <strong>"몸은 괜찮아?"</strong> 같은 구체적인 질문을 해보세요.' },
@@ -20,6 +21,8 @@ window.addEventListener('DOMContentLoaded', () => {
     location.href = 'index.html';
     return;
   }
+  studentId = getStudentId();
+  if (!studentId) return;
   const modal = document.getElementById('apiModal');
   if (modal) modal.style.display = 'none';
   applyTheme();
@@ -27,6 +30,18 @@ window.addEventListener('DOMContentLoaded', () => {
   renderKeywords();
   startChat();
 });
+// 학번 입력 (같은 창에서는 한 번만 물어봄)
+function getStudentId() {
+  let id = '';
+  try { id = sessionStorage.getItem('studentId') || ''; } catch (e) {}
+  while (!id) {
+    const input = prompt('학번을 입력하세요 (예: 10305)');
+    if (input === null) { location.href = 'index.html'; return null; }
+    id = input.trim();
+  }
+  try { sessionStorage.setItem('studentId', id); } catch (e) {}
+  return id;
+}
 function applyTheme() {
   document.documentElement.style.setProperty('--accent-bg',     currentCase.accentBg);
   document.documentElement.style.setProperty('--accent-border', currentCase.accentBorder);
@@ -132,7 +147,11 @@ async function callServer() {
   const res = await fetch(API_URL, {
     method  : 'POST',
     headers : { 'Content-Type': 'text/plain;charset=utf-8' },
-    body    : JSON.stringify({ messages: messages })
+    body    : JSON.stringify({
+      messages : messages,
+      student  : studentId,
+      caseNum  : parseInt(new URLSearchParams(window.location.search).get('case')) || 1
+    })
   });
   const data = await res.json();
   if (data.error) {
