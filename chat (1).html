@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>마약 예방 교육 - 면담 채팅</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+      font-family:'Noto Sans KR',sans-serif;
+      background:#f0f4ff;
+      color:#1a1a2e;
+      height:100vh;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+    }
+    /* 상단 바 */
+    .top-bar{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:12px 20px;
+      background:rgba(255,255,255,0.85);
+      border-bottom:1px solid rgba(30,30,80,0.1);
+      flex-shrink:0;gap:12px;
+    }
+    .top-left{display:flex;align-items:center;gap:12px;}
+    .back-btn{
+      background:rgba(80,100,200,0.07);
+      border:1px solid rgba(80,100,200,0.18);
+      color:rgba(30,30,80,0.65);
+      padding:7px 14px;border-radius:8px;
+      font-size:15px;font-family:'Noto Sans KR',sans-serif;
+      cursor:pointer;transition:all 0.2s;
+    }
+    .back-btn:hover{background:rgba(80,100,200,0.14);color:#1a1a2e;}
+    .case-avatar{
+      width:42px;height:42px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:20px;flex-shrink:0;
+      border:2px solid rgba(80,100,200,0.2);
+      background:rgba(80,100,200,0.07);
+    }
+    .case-name-area{display:flex;flex-direction:column;gap:2px;}
+    .case-name-area h2{font-size:17px;font-weight:700;color:#1a1a2e;}
+    .case-name-area span{font-size:14px;color:rgba(30,30,80,0.45);}
+    .top-tag-area{
+      display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:4px;
+    }
+    .drug-tag{
+      font-size:13px;padding:2px 10px;border-radius:20px;
+      font-weight:700;white-space:nowrap;
+    }
+    .keyword-tag{
+      font-size:12px;padding:2px 8px;border-radius:20px;
+      background:rgba(30,30,80,0.06);
+      border:1px solid rgba(30,30,80,0.12);
+      color:rgba(30,30,80,0.4);
+      white-space:nowrap;
+    }
+    /* 라포 게이지 */
+    .rapport-area{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+    .rapport-label{font-size:14px;color:rgba(30,30,80,0.45);white-space:nowrap;}
+    .rapport-bar{
+      width:130px;height:6px;
+      background:rgba(30,30,80,0.1);
+      border-radius:10px;overflow:hidden;
+    }
+    .rapport-fill{
+      height:100%;border-radius:10px;
+      background:linear-gradient(90deg,#ff6666,#ffaa00,#44cc88);
+      transition:width 1s ease;width:0%;
+    }
+    .rapport-pct{font-size:14px;font-weight:700;color:#1a1a2e;min-width:34px;}
+    /* 메인 레이아웃 */
+    .main-layout{display:flex;flex:1;overflow:hidden;}
+    .chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+    /* 채팅 메시지 */
+    .chat-messages{
+      flex:1;overflow-y:auto;
+      padding:20px 20px 8px;
+      display:flex;flex-direction:column;
+      gap:14px;scroll-behavior:smooth;
+    }
+    .chat-messages::-webkit-scrollbar{width:4px;}
+    .chat-messages::-webkit-scrollbar-thumb{background:rgba(30,30,80,0.12);border-radius:4px;}
+    .msg{display:flex;gap:10px;max-width:78%;animation:msgIn 0.3s ease;}
+    @keyframes msgIn{
+      from{opacity:0;transform:translateY(8px);}
+      to{opacity:1;transform:translateY(0);}
+    }
+    .msg.user{align-self:flex-end;flex-direction:row-reverse;}
+    .msg.bot{align-self:flex-start;}
+    .msg.symptom{align-self:flex-start;max-width:72%;}
+    .msg-avatar{
+      width:34px;height:34px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:16px;flex-shrink:0;
+      border:1.5px solid rgba(30,30,80,0.12);
+      background:rgba(80,100,200,0.07);
+    }
+    .msg-bubble{padding:11px 15px;border-radius:16px;font-size:16px;line-height:1.75;}
+    .msg.bot .msg-bubble{
+      background:rgba(255,255,255,0.9);
+      border:1px solid rgba(30,30,80,0.1);
+      border-bottom-left-radius:4px;
+      color:#1a1a2e;
+      box-shadow:0 2px 8px rgba(30,30,80,0.06);
+    }
+    .msg.user .msg-bubble{
+      background:var(--accent-bg,rgba(80,120,255,0.15));
+      border:1px solid var(--accent-border,rgba(80,120,255,0.35));
+      border-bottom-right-radius:4px;
+      color:#1a1a2e;
+    }
+    .msg.symptom .msg-bubble{
+      background:rgba(255,160,0,0.07);
+      border:1px solid rgba(255,160,0,0.22);
+      border-bottom-left-radius:4px;
+      color:rgba(150,90,0,0.9);
+      font-style:italic;font-size:15px;
+    }
+    /* 타이핑 인디케이터 */
+    .typing-indicator{
+      display:flex;align-items:center;gap:10px;
+      align-self:flex-start;padding:0 4px;
+    }
+    .typing-indicator.hidden{display:none;}
+    .typing-dots{
+      display:flex;gap:5px;
+      background:rgba(255,255,255,0.9);
+      border:1px solid rgba(30,30,80,0.1);
+      padding:12px 16px;border-radius:16px;
+      border-bottom-left-radius:4px;
+      box-shadow:0 2px 8px rgba(30,30,80,0.06);
+    }
+    .typing-dots span{
+      width:7px;height:7px;
+      background:rgba(30,30,80,0.3);
+      border-radius:50%;animation:dot 1.2s infinite;
+    }
+    .typing-dots span:nth-child(2){animation-delay:0.2s;}
+    .typing-dots span:nth-child(3){animation-delay:0.4s;}
+    @keyframes dot{
+      0%,80%,100%{transform:scale(0.7);opacity:0.4;}
+      40%{transform:scale(1);opacity:1;}
+    }
+    /* 입력창 */
+    .input-area{
+      padding:14px 20px;
+      background:rgba(255,255,255,0.8);
+      border-top:1px solid rgba(30,30,80,0.08);
+      display:flex;gap:10px;align-items:flex-end;flex-shrink:0;
+    }
+    .input-wrap{
+      flex:1;background:rgba(255,255,255,0.95);
+      border:1px solid rgba(30,30,80,0.14);
+      border-radius:14px;padding:11px 16px;
+      transition:border-color 0.2s;
+      box-shadow:0 2px 8px rgba(30,30,80,0.05);
+    }
+    .input-wrap:focus-within{border-color:var(--accent-border,rgba(80,120,255,0.5));}
+    #userInput{
+      width:100%;background:transparent;
+      border:none;outline:none;color:#1a1a2e;
+      font-size:16px;font-family:'Noto Sans KR',sans-serif;
+      resize:none;max-height:100px;line-height:1.6;
+    }
+    #userInput::placeholder{color:rgba(30,30,80,0.3);}
+    .send-btn{
+      width:46px;height:46px;border-radius:12px;border:none;
+      background:var(--accent-bg,rgba(80,120,255,0.25));
+      color:var(--accent-color,#3355dd);
+      font-size:18px;cursor:pointer;
+      transition:all 0.2s;
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;
+      border:1px solid var(--accent-border,rgba(80,120,255,0.4));
+    }
+    .send-btn:hover{filter:brightness(0.9);transform:scale(1.05);}
+    .send-btn:disabled{opacity:0.35;cursor:not-allowed;transform:none;}
+    /* 사이드 패널 */
+    .side-panel{
+      width:260px;border-left:1px solid rgba(30,30,80,0.09);
+      background:rgba(255,255,255,0.6);
+      display:flex;flex-direction:column;
+      overflow-y:auto;flex-shrink:0;
+    }
+    .side-panel::-webkit-scrollbar{width:3px;}
+    .side-panel::-webkit-scrollbar-thumb{background:rgba(30,30,80,0.1);border-radius:4px;}
+    .panel-section{padding:16px 14px;border-bottom:1px solid rgba(30,30,80,0.07);}
+    .panel-section h4{
+      font-size:13px;font-weight:700;letter-spacing:2px;
+      color:rgba(30,30,80,0.35);margin-bottom:12px;text-transform:uppercase;
+    }
+    /* 단계 리스트 */
+    .stage-list{display:flex;flex-direction:column;gap:7px;}
+    .stage-item{
+      display:flex;align-items:center;gap:10px;
+      padding:8px 10px;border-radius:8px;font-size:14px;
+      color:rgba(30,30,80,0.35);
+      background:rgba(30,30,80,0.02);
+      border:1px solid transparent;transition:all 0.4s;
+    }
+    .stage-item.active{
+      color:#1a1a2e;
+      background:rgba(80,120,255,0.07);
+      border-color:rgba(80,120,255,0.2);
+    }
+    .stage-item.done{
+      color:rgba(0,140,80,0.85);
+      background:rgba(0,180,100,0.06);
+      border-color:rgba(0,180,100,0.18);
+    }
+    .stage-dot{width:8px;height:8px;border-radius:50%;background:rgba(30,30,80,0.15);flex-shrink:0;}
+    .stage-item.active .stage-dot{
+      background:var(--accent-color,#3355dd);
+      box-shadow:0 0 6px var(--accent-color,#3355dd);
+      animation:pulse 1.5s infinite;
+    }
+    .stage-item.done .stage-dot{background:rgba(0,180,100,0.8);}
+    @keyframes pulse{
+      0%,100%{transform:scale(1);opacity:1;}
+      50%{transform:scale(1.4);opacity:0.7;}
+    }
+    /* 팁 박스 */
+    .tip-box{
+      background:rgba(255,200,50,0.08);
+      border:1px solid rgba(200,150,0,0.2);
+      border-radius:10px;padding:12px;
+      font-size:14px;color:rgba(120,80,0,0.9);line-height:1.7;
+    }
+    .tip-title{font-weight:700;margin-bottom:6px;}
+    /* 발견 키워드 */
+    .found-keywords{display:flex;flex-wrap:wrap;gap:6px;}
+    .found-kw{font-size:13px;padding:3px 10px;border-radius:8px;transition:all 0.4s;}
+    .found-kw.locked{
+      background:rgba(30,30,80,0.04);
+      border:1px solid rgba(30,30,80,0.09);
+      color:rgba(30,30,80,0.25);
+    }
+    .found-kw.unlocked{
+      background:rgba(0,180,100,0.08);
+      border:1px solid rgba(0,180,100,0.22);
+      color:rgba(0,140,80,0.9);
+    }
+    /* 종료 버튼 */
+    .end-btn{
+      margin:14px;padding:11px;border-radius:10px;
+      border:1px solid rgba(200,60,60,0.25);
+      background:rgba(255,80,80,0.06);
+      color:rgba(180,40,40,0.8);
+      font-size:15px;font-weight:700;
+      font-family:'Noto Sans KR',sans-serif;
+      cursor:pointer;transition:all 0.2s;
+      width:calc(100% - 28px);
+    }
+    .end-btn:hover{background:rgba(255,80,80,0.12);color:#cc2222;}
+    /* 결과 오버레이 */
+    .result-overlay{
+      position:fixed;inset:0;
+      background:rgba(200,210,255,0.6);
+      display:flex;align-items:center;justify-content:center;
+      z-index:999;backdrop-filter:blur(8px);
+    }
+    .result-overlay.hidden{display:none;}
+    .result-box{
+      background:#fff;
+      border:1px solid rgba(30,30,80,0.12);
+      border-radius:24px;padding:36px;
+      width:90%;max-width:540px;
+      max-height:85vh;overflow-y:auto;
+      box-shadow:0 20px 60px rgba(30,30,80,0.15);
+    }
+    .result-box h2{font-size:24px;font-weight:900;color:#1a1a2e;margin-bottom:6px;}
+    .result-sub{font-size:15px;color:rgba(30,30,80,0.45);margin-bottom:24px;}
+    .result-score-wrap{text-align:center;margin:20px 0;}
+    .result-score-num{
+      font-size:66px;font-weight:900;
+      background:linear-gradient(135deg,#2233aa,#5566ff,#8844cc);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;
+    }
+    .result-score-label{font-size:16px;color:rgba(30,30,80,0.45);margin-top:6px;}
+    .result-section{margin-bottom:20px;}
+    .result-section h4{
+      font-size:13px;font-weight:700;letter-spacing:2px;
+      color:rgba(30,30,80,0.35);text-transform:uppercase;margin-bottom:10px;
+    }
+    .result-kw-list{display:flex;flex-wrap:wrap;gap:7px;}
+    .result-kw{
+      font-size:14px;padding:4px 12px;border-radius:8px;
+      background:rgba(0,180,100,0.08);
+      border:1px solid rgba(0,180,100,0.22);
+      color:rgba(0,140,80,0.9);
+    }
+    .result-kw.missed{
+      background:rgba(255,80,80,0.07);
+      border-color:rgba(255,80,80,0.2);
+      color:rgba(200,40,40,0.8);
+    }
+    .help-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+    .help-card{
+      background:rgba(80,100,200,0.05);
+      border:1px solid rgba(80,100,200,0.12);
+      border-radius:10px;padding:10px 14px;
+      font-size:14px;color:rgba(30,30,80,0.5);
+    }
+    .help-card strong{display:block;font-size:17px;color:#1a1a2e;margin-top:3px;}
+    .result-back-btn{
+      width:100%;padding:13px;border-radius:12px;border:none;
+      background:linear-gradient(135deg,#4466ff,#7744ff);
+      color:#fff;font-size:17px;font-weight:700;
+      font-family:'Noto Sans KR',sans-serif;
+      cursor:pointer;transition:all 0.2s;margin-top:8px;
+    }
+    .result-back-btn:hover{filter:brightness(1.1);}
+    .result-action-row{display:flex;gap:8px;margin-top:10px;}
+    .result-action-btn{
+      flex:1;padding:12px;border-radius:12px;
+      font-size:16px;font-weight:700;
+      font-family:'Noto Sans KR',sans-serif;
+      cursor:pointer;transition:all 0.2s;
+      display:flex;align-items:center;justify-content:center;gap:6px;
+    }
+    .save-img-btn{
+      border:1px solid rgba(80,120,255,0.35);
+      background:rgba(80,120,255,0.08);
+      color:#3355dd;
+    }
+    .save-img-btn:hover{background:rgba(80,120,255,0.15);}
+    .save-img-btn:disabled{opacity:0.5;cursor:not-allowed;}
+    .padlet-btn{
+      border:1px solid rgba(0,180,100,0.35);
+      background:rgba(0,180,100,0.08);
+      color:#00994d;
+    }
+    .padlet-btn:hover{background:rgba(0,180,100,0.15);}
+    .transcript-btn{
+      width:100%;margin-top:8px;
+      border:1px solid rgba(120,80,220,0.35);
+      background:rgba(120,80,220,0.08);
+      color:#6633bb;
+    }
+    .transcript-btn:hover{background:rgba(120,80,220,0.15);}
+    .transcript-messages{
+      display:flex;flex-direction:column;gap:12px;
+      margin-bottom:20px;max-height:55vh;overflow-y:auto;padding-right:4px;
+    }
+    .transcript-msg{display:flex;max-width:85%;}
+    .transcript-msg.user{align-self:flex-end;justify-content:flex-end;}
+    .transcript-msg.bot{align-self:flex-start;}
+    .transcript-bubble{
+      padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.65;color:#1a1a2e;
+    }
+    .transcript-msg.user .transcript-bubble{
+      background:rgba(80,120,255,0.12);border:1px solid rgba(80,120,255,0.3);
+      border-bottom-right-radius:4px;
+    }
+    .transcript-msg.bot .transcript-bubble{
+      background:rgba(30,30,80,0.05);border:1px solid rgba(30,30,80,0.1);
+      border-bottom-left-radius:4px;
+    }
+    @media(max-width:768px){.side-panel{display:none;}}
+    @media(max-width:480px){
+      .rapport-area{display:none;}
+      .top-tag-area{display:none;}
+    }
+  </style>
+</head>
+<body>
+<!-- 결과 오버레이 -->
+<div class="result-overlay hidden" id="resultOverlay">
+  <div class="result-box">
+    <h2>📋 면담 종료 리포트</h2>
+    <p class="result-sub" id="resultSub"></p>
+    <div class="result-score-wrap">
+      <div class="result-score-num" id="resultScoreNum">0점</div>
+      <div class="result-score-label" id="resultScoreLabel"></div>
+    </div>
+    <div class="result-section">
+      <h4>✅ 발견한 정보</h4>
+      <div class="result-kw-list" id="resultFoundList"></div>
+    </div>
+    <div class="result-section">
+      <h4>❌ 놓친 정보</h4>
+      <div class="result-kw-list" id="resultMissedList"></div>
+    </div>
+    <div class="result-section">
+      <h4>📞 실제 도움 기관</h4>
+      <div class="help-grid">
+        <div class="help-card">마약류 중독 상담<strong>1899-0357</strong></div>
+        <div class="help-card">청소년 상담전화<strong>1388</strong></div>
+        <div class="help-card">정신건강 위기상담<strong>1577-0199</strong></div>
+        <div class="help-card">학교폭력 신고<strong>117</strong></div>
+      </div>
+    </div>
+    <button class="result-action-btn transcript-btn" onclick="showTranscript()">🗨️ 대화 다시보기</button>
+    <div class="result-action-row">
+      <button class="result-action-btn save-img-btn" id="saveImgBtn" onclick="saveResultImage()">📷 이미지로 저장</button>
+      <button class="result-action-btn padlet-btn" onclick="openPadlet()">📌 패들릿에 공유하기</button>
+    </div>
+    <button class="result-back-btn" onclick="location.href='index.html'">
+      ← 목록으로 돌아가기
+    </button>
+  </div>
+</div>
+<!-- 대화 다시보기 오버레이 -->
+<div class="result-overlay hidden" id="transcriptOverlay" style="z-index:1000;">
+  <div class="result-box" style="max-width:640px;">
+    <h2>🗨️ 대화 다시보기</h2>
+    <p class="result-sub" id="transcriptSub"></p>
+    <div class="transcript-messages" id="transcriptMessages"></div>
+    <button class="result-back-btn" onclick="closeTranscript()">← 결과로 돌아가기</button>
+  </div>
+</div>
+<!-- 상단 바 -->
+<div class="top-bar">
+  <div class="top-left">
+    <button class="back-btn" onclick="location.href='index.html'">← 목록</button>
+    <div class="case-avatar" id="topAvatar">👦</div>
+    <div class="case-name-area">
+      <h2 id="topName">로딩 중...</h2>
+      <span id="topSub"></span>
+      <div class="top-tag-area" id="topTagArea">
+        <span class="drug-tag" id="topDrugTag"></span>
+        <div id="topKeywords"></div>
+      </div>
+    </div>
+  </div>
+  <div class="rapport-area">
+    <span class="rapport-label">라포 형성도</span>
+    <div class="rapport-bar">
+      <div class="rapport-fill" id="rapportFill"></div>
+    </div>
+    <span class="rapport-pct" id="rapportPct">0%</span>
+  </div>
+</div>
+<!-- 메인 레이아웃 -->
+<div class="main-layout">
+  <div class="chat-area">
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="typing-indicator hidden" id="typingIndicator">
+      <div class="msg-avatar" id="typingAvatar">👦</div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    </div>
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea id="userInput" rows="1"
+          placeholder="면담자로서 메시지를 입력하세요..."
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"></textarea>
+      </div>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+  <!-- 사이드 패널 -->
+  <div class="side-panel">
+    <div class="panel-section">
+      <h4>📊 면담 진행 단계</h4>
+      <div class="stage-list">
+        <div class="stage-item active" id="stage0"><div class="stage-dot"></div><span>1단계 · 마음 열기</span></div>
+        <div class="stage-item" id="stage1"><div class="stage-dot"></div><span>2단계 · 속마음 나누기</span></div>
+        <div class="stage-item" id="stage2"><div class="stage-dot"></div><span>3단계 · 고백과 도움 요청</span></div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <h4>💡 면담 팁</h4>
+      <div class="tip-box">
+        <div class="tip-title" id="tipTitle">🔰 시작 단계</div>
+        <div id="tipText">비난하지 말고 <strong>"그랬구나"</strong>, <strong>"많이 힘들었겠다"</strong> 같은 공감 표현을 사용해보세요.</div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <h4>🔍 발견한 정보</h4>
+      <div class="found-keywords" id="foundKeywords"></div>
+    </div>
+    <button class="end-btn" onclick="endSession()">⏹ 면담 종료</button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="cases.js"></script>
+<script src="chat.js"></script>
+</body>
+</html>

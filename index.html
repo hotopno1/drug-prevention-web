@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>마약 예방 교육 - 사례 선택</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: #f0f4ff;
+      color: #1a1a2e;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(100,140,255,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(180,100,255,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse at 60% 80%, rgba(80,200,220,0.08) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 20px 60px;
+    }
+    .header { text-align: center; margin-bottom: 16px; }
+    .badge {
+      display: inline-block;
+      background: rgba(80,120,255,0.12);
+      border: 1px solid rgba(80,120,255,0.35);
+      color: #4466ee;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      padding: 6px 18px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      font-size: clamp(24px, 4vw, 42px);
+      font-weight: 900;
+      line-height: 1.3;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, #2233aa 0%, #5566ff 50%, #8844cc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header p {
+      font-size: 15px;
+      color: rgba(30,30,80,0.6);
+      line-height: 1.8;
+      max-width: 600px;
+      margin: 0 auto 32px;
+    }
+    .warning-banner {
+      background: rgba(255,200,50,0.12);
+      border: 1px solid rgba(220,160,0,0.35);
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      max-width: 700px;
+      margin: 0 auto 48px;
+      font-size: 13px;
+      color: rgba(120,80,0,0.9);
+      line-height: 1.6;
+    }
+    .warning-banner .icon { font-size: 20px; flex-shrink: 0; }
+    .section-title {
+      text-align: center;
+      font-size: 13px;
+      color: rgba(30,30,80,0.4);
+      letter-spacing: 2px;
+      margin-bottom: 28px;
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-bottom: 60px;
+    }
+    .case-card {
+      background: rgba(255,255,255,0.82);
+      border: 1px solid rgba(180,190,255,0.4);
+      border-radius: 20px;
+      padding: 28px;
+      cursor: pointer;
+      transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(80,100,200,0.08);
+    }
+    .case-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--card-glow);
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      border-radius: 20px;
+    }
+    .case-card:hover::before { opacity: 1; }
+    .case-card:hover {
+      border-color: var(--card-accent);
+      transform: translateY(-6px);
+      box-shadow: 0 20px 40px rgba(80,100,200,0.15), 0 0 30px var(--card-shadow);
+    }
+    .card-01 {
+      --card-accent: rgba(220,80,160,0.5);
+      --card-glow: linear-gradient(135deg,rgba(220,80,160,0.07) 0%,transparent 60%);
+      --card-shadow: rgba(220,80,160,0.15);
+      --tag-color: #cc3388;
+      --tag-bg: rgba(220,80,160,0.10);
+    }
+    .card-02 {
+      --card-accent: rgba(80,120,255,0.5);
+      --card-glow: linear-gradient(135deg,rgba(80,120,255,0.07) 0%,transparent 60%);
+      --card-shadow: rgba(80,120,255,0.15);
+      --tag-color: #3355dd;
+      --tag-bg: rgba(80,120,255,0.10);
+    }
+    .card-03 {
+      --card-accent: rgba(0,170,180,0.5);
+      --card-glow: linear-gradient(135deg,rgba(0,170,180,0.07) 0%,transparent 60%);
+      --card-shadow: rgba(0,170,180,0.15);
+      --tag-color: #007788;
+      --tag-bg: rgba(0,170,180,0.10);
+    }
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .case-number { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: rgba(30,30,80,0.35); }
+    .difficulty-badge {
+      font-size: 11px; font-weight: 600;
+      padding: 4px 10px; border-radius: 10px;
+      background: var(--tag-bg);
+      color: var(--tag-color);
+      border: 1px solid var(--card-accent);
+    }
+    .avatar-area { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+    .avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: var(--tag-bg);
+      border: 2px solid var(--card-accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; flex-shrink: 0;
+    }
+    .avatar-info h3 { font-size: 20px; font-weight: 900; color: #1a1a2e; margin-bottom: 4px; }
+    .avatar-info .age-gender { font-size: 13px; color: rgba(30,30,80,0.5); }
+    .divider { height: 1px; background: rgba(30,30,80,0.08); margin-bottom: 18px; }
+    .drug-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--tag-bg);
+      border: 1px solid var(--card-accent);
+      color: var(--tag-color);
+      font-size: 12px; font-weight: 700;
+      padding: 5px 12px; border-radius: 20px; margin-bottom: 14px;
+    }
+    .card-theme { font-size: 14px; font-weight: 700; color: rgba(20,20,60,0.8); line-height: 1.5; margin-bottom: 14px; }
+    .keywords { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
+    .keyword {
+      font-size: 11px;
+      background: rgba(30,30,80,0.06);
+      border: 1px solid rgba(30,30,80,0.12);
+      color: rgba(30,30,80,0.5);
+      padding: 3px 10px; border-radius: 8px;
+    }
+    .start-btn {
+      width: 100%; padding: 13px; border-radius: 12px;
+      border: 1px solid var(--card-accent);
+      background: var(--tag-bg);
+      color: var(--tag-color);
+      font-size: 14px; font-weight: 700;
+      font-family: 'Noto Sans KR', sans-serif;
+      cursor: pointer; transition: all 0.2s ease;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .start-btn:hover { background: var(--card-accent); color: #fff; box-shadow: 0 0 20px var(--card-shadow); }
+    .arrow { transition: transform 0.2s ease; }
+    .case-card:hover .arrow { transform: translateX(4px); }
+    .help-section { border-top: 1px solid rgba(30,30,80,0.1); padding-top: 32px; text-align: center; }
+    .help-section p { font-size: 13px; color: rgba(30,30,80,0.4); margin-bottom: 16px; }
+    .help-contacts { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+    .help-contact {
+      background: rgba(255,255,255,0.8);
+      border: 1px solid rgba(30,30,80,0.12);
+      border-radius: 10px; padding: 10px 18px;
+      font-size: 13px; color: rgba(30,30,80,0.55);
+    }
+    .help-contact strong { display: block; font-size: 15px; color: rgba(30,30,80,0.8); margin-top: 2px; }
+    @media (max-width: 900px) {
+      .cards-grid { grid-template-columns: 1fr; }
+      .header h1 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="badge">⚠ 마약 예방 교육 프로그램</div>
+    <h1>일상이 무너진 약물사용자의 고백</h1>
+    <p>
+      아래 3명 중 한 명을 선택해 면담을 시작하세요.<br/>
+      가상의 인물과 채팅 면담을 진행하며<br/>
+      마약이 삶을 어떻게 무너뜨리는지 직접 경험합니다.
+    </p>
+    <div class="warning-banner">
+      <span class="icon">📋</span>
+      <span>
+        상담 전 <strong>면담 기록지</strong>를 준비하세요.
+        대화하면서 대상자의 증상, 피해, 심리 상태를 직접 기록합니다.<br/>이 시나리오는 모두 <strong>교육 목적의 가상 인물</strong>입니다.
+      </span>
+    </div>
+  </div>
+
+  <div class="section-title">— 면담 대상자 선택 —</div>
+
+  <div class="cards-grid">
+    <!-- 사례 01: 이소희 - 식욕억제제 -->
+    <div class="case-card card-01" onclick="startCase(1)">
+      <div class="card-header">
+        <span class="case-number">CASE 01</span>
+        <span class="difficulty-badge">⭐ 입문</span>
+      </div>
+      <div class="avatar-area">
+        <img src="data:image/jpeg;base64,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" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--card-accent);" alt="이O희"/>
+        <div class="avatar-info">
+          <h3>이O희</h3>
+          <span class="age-gender">16세 · 여 · 고등학교 1학년</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="drug-tag">💊 식욕억제제</div>
+      <div class="card-theme">"뼈말라를 꿈꾸던 나비의 추락,<br/>'식욕억제제'의 덫"</div>
+      <div class="keywords">
+        <span class="keyword"># 다이어트 온라인 커뮤니티</span>
+        <span class="keyword"># 다이어트 강박</span>
+        <span class="keyword"># 부정맥</span>
+        <span class="keyword"># 명의 도용</span>
+      </div>
+      <button class="start-btn">면담 시작하기 <span class="arrow">→</span></button>
+    </div>
+
+    <!-- 사례 02: 김준서 - ADHD 치료제 -->
+    <div class="case-card card-02" onclick="startCase(2)">
+      <div class="card-header">
+        <span class="case-number">CASE 02</span>
+        <span class="difficulty-badge">⭐⭐ 보통</span>
+      </div>
+      <div class="avatar-area">
+        <img src="data:image/jpeg;base64,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" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--card-accent);" alt="김O서"/>
+        <div class="avatar-info">
+          <h3>김O서</h3>
+          <span class="age-gender">17세 · 남 · 고등학교 2학년</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="drug-tag">💊 ADHD 치료제</div>
+      <div class="card-theme">"모범생의 추락,<br/>'스마트 알약'이라는 거짓말"</div>
+      <div class="keywords">
+        <span class="keyword"># SNS 유혹</span>
+        <span class="keyword"># 성적 강박</span>
+        <span class="keyword"># 던지기 알바/경제 손실</span>
+        <span class="keyword"># 가족/친구 관계</span>
+      </div>
+      <button class="start-btn">면담 시작하기 <span class="arrow">→</span></button>
+    </div>
+
+    <!-- 사례 03: 박민기 - 펜타닐 패치 -->
+    <div class="case-card card-03" onclick="startCase(3)">
+      <div class="card-header">
+        <span class="case-number">CASE 03</span>
+        <span class="difficulty-badge">⭐⭐⭐ 어려움</span>
+      </div>
+      <div class="avatar-area">
+        <img src="data:image/jpeg;base64,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" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--card-accent);" alt="박O기"/>
+        <div class="avatar-info">
+          <h3>박O기</h3>
+          <span class="age-gender">15세 · 남 · 중학교 3학년</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="drug-tag">💊 펜타닐 패치</div>
+      <div class="card-theme">"호기심이 부른 치명적 유혹,<br/>SNS 펜타닐 중독"</div>
+      <div class="keywords">
+        <span class="keyword"># 틱톡 좀비 놀이</span>
+        <span class="keyword"># 인지 저하</span>
+        <span class="keyword"># 학교 절도</span>
+        <span class="keyword"># 집단 따돌림</span>
+      </div>
+      <button class="start-btn">면담 시작하기 <span class="arrow">→</span></button>
+    </div>
+  </div>
+
+  <div class="help-section">
+    <p>📞 실제로 도움이 필요하다면 아래 기관에 연락하세요</p>
+    <div class="help-contacts">
+      <div class="help-contact">마약류 중독 상담<strong>1899-0357</strong></div>
+      <div class="help-contact">청소년 상담전화<strong>1388</strong></div>
+      <div class="help-contact">정신건강 위기상담<strong>1577-0199</strong></div>
+      <div class="help-contact">학교폭력 신고<strong>117</strong></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function startCase(num) {
+    window.location.href = 'chat.html?case=' + num;
+  }
+</script>
+</body>
+</html>
